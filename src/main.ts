@@ -38,24 +38,11 @@ async function run(): Promise<void> {
     const pathToCachedDeb = `${cacheDir}/${fname}`
     await exec('sudo', ['apt-get', 'install', '-y', pathToCachedDeb])
 
-    const [majorVersion, minorVersion] = systemVersion.split('.').map(num => parseInt(num, 10));
-    if (majorVersion > 23 || (majorVersion === 23 && minorVersion > 10)) {
-//       const apparmorConfig = `
-// # Permit unprivileged user namespace creation for apptainer starter
-// abi <abi/4.0>,
-// include <tunables/global>
-// profile apptainer /usr/local/libexec/apptainer/bin/starter{,-suid} 
-//     flags=(unconfined) {
-//   userns,
-//   # Site-specific additions and overrides. See local/README for details.
-//   include if exists <local/apptainer>
-// }`;
-    
-//       info('Updating AppArmor configuration...');
-//       const inputBuffer = Buffer.from(apparmorConfig, 'utf-8');
-//       await exec('sudo', ['tee', '/etc/apparmor.d/apptainer'], { input: inputBuffer });
-//       await exec('sudo', ['systemctl', 'reload', 'apparmor']);
-
+    const [systemMajorVersion, systemMinorVersion] = systemVersion.split('.').map(num => parseInt(num, 10));
+    const [majorVersion, minorVersion] = versionSpec.split('.').map(num => parseInt(num, 10));
+    // Disabling AppArmor when Singularity <= 1.3 and Ubuntu >= 23.10
+    // https://github.com/apptainer/apptainer/pull/2368
+    if ((majorVersion === 1 && minorVersion <= 3) && (systemMajorVersion > 23 || (systemMajorVersion === 23 && systemMinorVersion > 10))) {
       info('Disabling AppArmor restrictions on unprivileged user namespaces...');
       const sysctlConfigCommand = 'echo kernel.apparmor_restrict_unprivileged_userns=0 > /etc/sysctl.d/90-disable-userns-restrictions.conf';
       await exec('sudo', ['sh', '-c', sysctlConfigCommand]);
